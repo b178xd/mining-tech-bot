@@ -16,7 +16,7 @@ const client = new Client({
 const TRACKER_CHANNEL_ID = '1403313906906173480'; 
 
 // Basic list to track names
-const linkedPlayers = ["b178xd", "Ahmds_19", "windowss1345"]; // Add your Roblox name here inside quotes!
+const linkedPlayers = ["a678xd", "Ahmds_19", "windowss1345"]; // Add your Roblox name here inside quotes!
 
 client.on('messageCreate', async (message) => {
     // Monitor the original channel logs
