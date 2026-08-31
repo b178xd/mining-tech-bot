@@ -1,4 +1,4 @@
-const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
 const express = require('express');
 const app = express();
 
@@ -9,17 +9,20 @@ const client = new Client({
     intents: [
         GatewayIntentBits.Guilds, 
         GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent
-    ] 
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildPresences,
+        GatewayIntentBits.GuildMembers
+    ],
+    // PARTIALS SĄ KLUCZOWE DO NASŁUCHIWANIA WEBHOOKÓW ORAZ STARYCH WIADOMOŚCI
+    partials: [Partials.Message, Partials.Channel, Partials.User]
 });
 
 const TRACKER_CHANNEL_ID = '1403313906906173480'; 
 
-// This map links { RobloxUsername: DiscordUserID }
 const linkedPlayers = new Map();
 
 client.on('messageCreate', async (message) => {
-    // 1. MONITOR THE INCOMING LOGS IN THAT CHANNEL
+    // 1. MONITOROWANIE KANAŁU Z GRY
     if (message.channel.id === TRACKER_CHANNEL_ID) {
         if (message.embeds.length > 0) {
             const myChannel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
@@ -36,7 +39,6 @@ client.on('messageCreate', async (message) => {
                 }
             }
 
-            // ONLY forward if the player has connected their Roblox name!
             if (matchedUser) {
                 const discordUserId = linkedPlayers.get(matchedUser);
                 const clonedEmbed = EmbedBuilder.from(originalEmbed);
@@ -49,10 +51,9 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // 2. TEXT COMMANDS FOR CONNECTING PEOPLE (Ignore other bots)
+    // 2. KOMENDY DLA UŻYTKOWNIKÓW
     if (message.author.bot) return;
 
-    // Type "!link RobloxName" to connect
     if (message.content.startsWith('!link ')) {
         const robloxName = message.content.slice(6).trim();
         
@@ -64,7 +65,6 @@ client.on('messageCreate', async (message) => {
         message.reply(`✅ Connected! I am now tracking rare drops for **${robloxName}**.`);
     }
 
-    // Type "!linked" to check who is connected
     if (message.content === '!linked') {
         if (linkedPlayers.size === 0) return message.reply("No accounts are currently connected!");
         
