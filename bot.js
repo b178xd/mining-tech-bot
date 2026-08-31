@@ -1,76 +1,52 @@
-const { Client, GatewayIntentBits, Partials, EmbedBuilder } = require('discord.js');
+const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 const app = express();
 
 app.get('/', (req, res) => res.send('Mining Tech Sync Bot Active!'));
 app.listen(process.env.PORT || 3000);
 
+// We stripped out all special intents! Discord will NEVER block this basic login.
 const client = new Client({ 
     intents: [
         GatewayIntentBits.Guilds, 
-        GatewayIntentBits.GuildMessages, 
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Message, Partials.Channel, Partials.User]
+        GatewayIntentBits.GuildMessages
+    ]
 });
 
 const TRACKER_CHANNEL_ID = '1403313906906173480'; 
 
-const linkedPlayers = new Map();
+// Basic list to track names
+const linkedPlayers = ["b178xd", "Ahmds_19", "windowss1345"]; // Add your Roblox name here inside quotes!
 
 client.on('messageCreate', async (message) => {
-    if (message.channel.id === TRACKER_CHANNEL_ID) {
-        if (message.embeds.length > 0) {
-            const myChannel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
-            if (!myChannel) return;
+    // Monitor the original channel logs
+    if (message.channel.id === TRACKER_CHANNEL_ID && message.embeds.length > 0) {
+        const myChannel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
+        if (!myChannel) return;
 
-            const originalEmbed = message.embeds[0];
-            const contentText = (originalEmbed.description || "") + (originalEmbed.author?.name || "");
+        const originalEmbed = message.embeds[0];
+        const contentText = (originalEmbed.description || "") + (originalEmbed.author?.name || "");
 
-            let matchedUser = null;
-            for (let robloxName of linkedPlayers.keys()) {
-                if (contentText.toLowerCase().includes(robloxName.toLowerCase())) {
-                    matchedUser = robloxName;
-                    break;
-                }
-            }
-
-            if (matchedUser) {
-                const discordUserId = linkedPlayers.get(matchedUser);
-                const clonedEmbed = EmbedBuilder.from(originalEmbed);
-                
-                myChannel.send({ 
-                    content: `🎉 **Rare Find!** <@${discordUserId}> just hit big!`, 
-                    embeds: [clonedEmbed] 
-                }).catch(console.error);
+        // Check if any whitelisted name is found in the drop text
+        let isMatched = false;
+        for (let robloxName of linkedPlayers) {
+            if (contentText.toLowerCase().includes(robloxName.toLowerCase())) {
+                isMatched = true;
+                break;
             }
         }
-    }
 
-    if (message.author.bot) return;
-
-    if (message.content.startsWith('!link ')) {
-        const robloxName = message.content.slice(6).trim();
-        
-        if (!robloxName) {
-            return message.reply("❌ Please provide a valid username! Example: `!link Builderman`");
+        // Forward it if it's a match!
+        if (isMatched) {
+            const clonedEmbed = EmbedBuilder.from(originalEmbed);
+            myChannel.send({ 
+                content: `🎉 **New Rare Drop Detected!**`, 
+                embeds: [clonedEmbed] 
+            }).catch(console.error);
         }
-
-        linkedPlayers.set(robloxName, message.author.id);
-        message.reply(`✅ Connected! I am now tracking rare drops for **${robloxName}**.`);
-    }
-
-    if (message.content === '!linked') {
-        if (linkedPlayers.size === 0) return message.reply("No accounts are currently connected!");
-        
-        let list = "📋 **Currently Monitored Players:**\n";
-        linkedPlayers.forEach((discordId, robloxName) => {
-            list += `• **${robloxName}** -> <@${discordId}>\n`;
-        });
-        message.reply(list);
     }
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
 
