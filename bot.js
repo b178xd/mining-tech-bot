@@ -2,8 +2,7 @@ const { Client, GatewayIntentBits, EmbedBuilder } = require('discord.js');
 const express = require('express');
 const app = express();
 
-// We keep express alive so Render doesn't shut down your app
-app.get('/', (req, res) => res.send('Mining Tech Tracker is active!'));
+app.get('/', (req, res) => res.send('Mining Tech Sync Bot Active!'));
 app.listen(process.env.PORT || 3000);
 
 const client = new Client({ 
@@ -14,36 +13,67 @@ const client = new Client({
     ] 
 });
 
-// The exact tracker channel ID you want to look at
 const TRACKER_CHANNEL_ID = '1403313906906173480'; 
 
-client.on('messageCreate', async (message) => {
-    // 1. Check if the message is coming from the target channel
-    if (message.channel.id === TRACKER_CHANNEL_ID) {
-        
-        // Find your own server's target channel where the bot drops the clones
-        const myChannel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
-        if (!myChannel) return;
+// This map links { RobloxUsername: DiscordUserID }
+const linkedPlayers = new Map();
 
-        // 2. If the original message has an embed structure (like high-tier ore cards)
+client.on('messageCreate', async (message) => {
+    // 1. MONITOR THE INCOMING LOGS IN THAT CHANNEL
+    if (message.channel.id === TRACKER_CHANNEL_ID) {
         if (message.embeds.length > 0) {
-            // Clone the embeds and forward them to your channel
-            const clonedEmbeds = message.embeds.map(oldEmbed => EmbedBuilder.from(oldEmbed));
-            
-            myChannel.send({ 
-                content: message.content || null, 
-                embeds: clonedEmbeds 
-            }).catch(console.error);
-        } 
-        // 3. If it's just a regular text message alert
-        else if (message.content) {
-            myChannel.send({ content: message.content }).catch(console.error);
+            const myChannel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID);
+            if (!myChannel) return;
+
+            const originalEmbed = message.embeds[0];
+            const contentText = (originalEmbed.description || "") + (originalEmbed.author?.name || "");
+
+            let matchedUser = null;
+            for (let robloxName of linkedPlayers.keys()) {
+                if (contentText.toLowerCase().includes(robloxName.toLowerCase())) {
+                    matchedUser = robloxName;
+                    break;
+                }
+            }
+
+            // ONLY forward if the player has connected their Roblox name!
+            if (matchedUser) {
+                const discordUserId = linkedPlayers.get(matchedUser);
+                const clonedEmbed = EmbedBuilder.from(originalEmbed);
+                
+                myChannel.send({ 
+                    content: `🎉 **Rare Find!** <@${discordUserId}> just hit big!`, 
+                    embeds: [clonedEmbed] 
+                }).catch(console.error);
+            }
         }
+    }
+
+    // 2. TEXT COMMANDS FOR CONNECTING PEOPLE (Ignore other bots)
+    if (message.author.bot) return;
+
+    // Type "!link RobloxName" to connect
+    if (message.content.startsWith('!link ')) {
+        const robloxName = message.content.slice(6).trim();
+        
+        if (!robloxName) {
+            return message.reply("❌ Please provide a valid username! Example: `!link Builderman`");
+        }
+
+        linkedPlayers.set(robloxName, message.author.id);
+        message.reply(`✅ Connected! I am now tracking rare drops for **${robloxName}**.`);
+    }
+
+    // Type "!linked" to check who is connected
+    if (message.content === '!linked') {
+        if (linkedPlayers.size === 0) return message.reply("No accounts are currently connected!");
+        
+        let list = "📋 **Currently Monitored Players:**\n";
+        linkedPlayers.forEach((discordId, robloxName) => {
+            list += `• **${robloxName}** -> <@${discordId}>\n`;
+        });
+        message.reply(list);
     }
 });
 
 client.login(process.env.DISCORD_TOKEN);
-
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Bot server listening on port ${PORT}`));
