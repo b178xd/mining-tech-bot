@@ -6,23 +6,30 @@ app.use(express.json());
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds] });
 
-app.post('/ore-mined', (req, res) => {
-    const { playerName, oreName, tier } = req.body;
+// This endpoint listens for incoming chat data from your computer
+app.post('/check-chat', (req, res) => {
+    const { chatMessage } = req.body;
     
-    // This reads the Discord Channel ID you will set later in the Render dashboard
-    const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID); 
-    
-    if (channel) {
-        const embed = new EmbedBuilder()
-            .setTitle('💎 Rare Ore Found! 💎')
-            .setDescription(`**${playerName}** just mined a **${oreName}** (Tier ${tier})!`)
-            .setColor(0x00FFCC)
-            .setTimestamp();
+    // Filters for Mining Tech game alerts (looking for keywords like "found a" or "tier")
+    if (chatMessage.toLowerCase().includes('found a') || chatMessage.toLowerCase().includes('tier')) {
+        
+        const channel = client.channels.cache.get(process.env.DISCORD_CHANNEL_ID); 
+        
+        if (channel) {
+            // Cleans up the log line by removing the technical Roblox markers
+            const cleanText = chatMessage.split('] ').pop() || chatMessage;
 
-        channel.send({ embeds: [embed] });
-        return res.status(200).send("Notification sent.");
+            const embed = new EmbedBuilder()
+                .setTitle('💎 RARE ORE MINED! 💎')
+                .setDescription(`🚀 **Private Server Broadcast:**\n\`\`\`text\n${cleanText.trim()}\n\`\`\``)
+                .setColor(0x00FFCC)
+                .setTimestamp();
+
+            channel.send({ embeds: [embed] });
+            return res.status(200).send("Notification sent to Discord.");
+        }
     }
-    res.status(500).send("Channel not found.");
+    res.status(200).send("Message ignored (normal chat).");
 });
 
 client.login(process.env.DISCORD_TOKEN);
