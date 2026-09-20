@@ -15,7 +15,7 @@ const client = new Client({
 const TRACKER_CHANNEL_ID = '1403313906906173480'; 
 const linkedPlayers = ["a678xd", "Ahmds_19", "windowss1345"]; 
 
-// --- 1. AUTOMATYCZNA REJESTRACJA KOMENDY SLASH PO URUCHOMIENIU ---
+// BŁYSKAWICZNA REJESTRACJA NA TWOIM SERWERZE
 client.once('ready', async () => {
     try {
         const commands = [{
@@ -31,18 +31,21 @@ client.once('ready', async () => {
 
         const rest = new REST({ version: '10' }).setToken(process.env.DISCORD_TOKEN);
         
-        // Rejestrujemy komendę slash globalnie dla Twojej aplikacji bota
-        await rest.put(
-            Routes.applicationCommands(client.user.id),
-            { body: commands }
-        );
-        console.log("✅ Successfully registered /ore command automatically!");
+        // Pobieramy ID Twojego serwera i rejestrujemy komendę lokalnie w 1 sekundę
+        const guilds = await client.guilds.fetch();
+        for (const [guildId] of guilds) {
+            await rest.put(
+                Routes.applicationGuildCommands(client.user.id, guildId),
+                { body: commands }
+            );
+        }
+        console.log("✅ Błyskawiczna rejestracja /ore zakończona sukcesem!");
     } catch (error) {
-        console.error("Error registering command automatically:", error);
+        console.error("Błąd automatycznej rejestracji:", error);
     }
 });
 
-// --- 2. OBSŁUGA KOMENDY SLASH (/ore) ---
+// --- OBSŁUGA KOMENDY SLASH (/ore) ---
 client.on('interactionCreate', async (interaction) => {
     if (!interaction.isChatInputCommand()) return;
 
@@ -54,10 +57,10 @@ client.on('interactionCreate', async (interaction) => {
         const infoEmbed = new EmbedBuilder()
             .setTitle(`⛏️ Mining Tech Wiki Lookup: ${formattedName}`)
             .setURL(wikiUrl)
-            .setDescription(`Click the link above to view this ore on the Wiki!`)
+            .setDescription(`Kliknij w link powyżej, aby zobaczyć tę rudę na oficjalnej Wiki gry!`)
             .addFields(
-                { name: 'Target Resource Name', value: formattedName, inline: true },
-                { name: 'Wiki Reference Page', value: `🌐 [Open ${formattedName} Wiki Page](${wikiUrl})`, inline: false }
+                { name: 'Nazwa zasobu', value: formattedName, inline: true },
+                { name: 'Strona Wiki Fandom', value: `🌐 [Otwórz stronę ${formattedName}](${wikiUrl})`, inline: false }
             )
             .setColor(0x00FFCC)
             .setTimestamp();
@@ -66,7 +69,7 @@ client.on('interactionCreate', async (interaction) => {
     }
 });
 
-// --- 3. LIVE MONITORING LOGÓW I SEPARACJA KANAŁÓW ---
+// --- MONITORING LOGÓW Z SEPARACJĄ KANAŁÓW ---
 client.on('messageCreate', async (message) => {
     if (message.channel.id === TRACKER_CHANNEL_ID && message.embeds.length > 0) {
         const mainEmbed = message.embeds[0];
@@ -105,3 +108,4 @@ client.on('messageCreate', async (message) => {
 });
 
 client.login(process.env.DISCORD_TOKEN);
+
