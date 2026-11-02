@@ -1,13 +1,21 @@
+
 {
   "name": "mining-tech-bot",
-  "version": "1.0.0",
-  "description": "Discord bot for tracking Mining Tech ores",
+  "version": "2.0.0",
+  "description": "Discord bot for tracking Mining Tech ores + with Mister T9 AI Voice Assistant",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
+  "engines": {
+    "node": ">=20"
+  },
   "dependencies": {
+    "@discordjs/opus": "^0.10.0",
+    "@discordjs/voice": "^0.19.0",
     "discord.js": "^14.14.1",
-    "express": "^4.18.2"
+    "express": "^4.18.2",
+    "prism-media": "^1.3.5",
+    "dotenv": "^16.4.5"
   }
 }
