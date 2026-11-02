@@ -458,47 +458,56 @@ async function speak(guildId, text) {
 
   const safeText = String(text).slice(0, 700);
 
-  console.log("TTS: generating voice response.");
+  console.log("TTS: generating Microsoft Edge voice response.");
 
-  const audioParts = googleTTS.getAllAudioUrls(
-    safeText,
-    {
-      lang: "en",
-      slow: true,
-      host: "https://translate.google.com"
+  try {
+    // Load Microsoft Edge TTS.
+    const { EdgeTTS } = await import("@andresaya/edge-tts");
+    const tts = new EdgeTTS();
+
+    // Generate speech using a natural English voice.
+    const result = await tts.generate(
+      safeText,
+      "en-US-GuyNeural",
+      {
+        outputFormat: "webm-24khz-16bit-mono-opus",
+        rate: "-5%",
+        volume: "90%"
+      }
+    );
+
+    const audioBuffer = Buffer.from(result.audio);
+
+    if (!audioBuffer.length) {
+      throw new Error("Microsoft Edge TTS returned empty audio.");
     }
-  );
 
-  for (const part of audioParts) {
+    console.log("TTS: audio generated:", audioBuffer.length, "bytes.");
+
+    // Make sure the voice session still exists.
     if (voiceSessions.get(guildId) !== session) {
       return;
     }
 
-    const response = await fetch(part.url);
-
-    if (!response.ok) {
-      throw new Error(
-        `Google TTS error: ${response.status}`
-      );
-    }
-
-    const audioBuffer = Buffer.from(
-      await response.arrayBuffer()
-    );
-
     const resource = createAudioResource(
       Readable.from(audioBuffer),
       {
-        inputType: StreamType.Arbitrary
+        inputType: StreamType.WebmOpus
       }
     );
 
     session.player.play(resource);
 
-    await waitForPlayerIdle(session.player);
-  }
+    console.log("TTS: playing audio in Discord.");
 
-  console.log("TTS: finished speaking.");
+    await waitForPlayerIdle(session.player);
+
+    console.log("TTS: finished speaking.");
+
+  } catch (error) {
+    console.error("MICROSOFT EDGE TTS ERROR:", error);
+    throw error;
+  }
 }
 
 // --------------------------------------------------
