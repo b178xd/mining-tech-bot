@@ -195,12 +195,27 @@ async function geminiGenerate(
     );
   }
 
-  if (!response.ok) {
-    throw new Error(
-      data.error?.message ||
-      `Gemini API error: ${response.status}`
-    );
+if (!response.ok) {
+  const message =
+    data.error?.message ||
+    `Gemini API error: ${response.status}`;
+
+  const temporaryError =
+    response.status === 429 ||
+    response.status === 500 ||
+    response.status === 502 ||
+    response.status === 503 ||
+    response.status === 504 ||
+    message.toLowerCase().includes("high demand");
+
+  if (temporaryError) {
+    const error = new Error(message);
+    error.retryable = true;
+    throw error;
   }
+
+  throw new Error(message);
+}
 
   const result = (
     data.candidates?.[0]?.content?.parts || []
