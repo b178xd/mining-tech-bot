@@ -1,0 +1,34 @@
+
+services:
+  - type: worker
+    name: mining-tech-mister-t9
+    runtime: node
+    plan: starter
+
+    buildCommand: npm install
+    startCommand: npm start
+
+    envVars:
+      - key: DISCORD_TOKEN
+        sync: false
+
+      - key: OPENAI_API_KEY
+        sync: false
+
+      - key: TRACKER_CHANNEL_ID
+        value: "1403313906906173480"
+
+      - key: DISCORD_CHANNEL_ID
+        sync: false
+
+      - key: DISCORD_PRIVATE_CHANNEL_ID
+        sync: false
+
+      - key: FANDOM_API_URL
+        sync: false
+
+      - key: OTHER_WIKI_API_URL
+        sync: false
+
+      - key: WIKI_API_URLS
+        value: "https://en.wikipedia.org/w/api.php"
