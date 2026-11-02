@@ -37,7 +37,6 @@ const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 
 const GEMINI_MODEL =
-const GEMINI_MODEL =
   process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const TRACKER_CHANNEL_ID =
   process.env.TRACKER_CHANNEL_ID || "1403313906906173480";
