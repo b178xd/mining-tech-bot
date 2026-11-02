@@ -131,6 +131,7 @@ const voiceSessions = new Map();
 const processingUsers = new Set();
 const armedUsers = new Map();
 
+
 // --------------------------------------------------
 // GEMINI API
 // --------------------------------------------------
@@ -143,26 +144,56 @@ async function geminiGenerate(
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
-  const response = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "x-goog-api-key": GEMINI_API_KEY
-    },
-    body: JSON.stringify({
-      systemInstruction: {
-        parts: [{ text: systemInstruction }]
-      },
-      contents,
-      generationConfig: {
-        temperature: options.temperature ?? 0.5,
-        maxOutputTokens: options.maxOutputTokens ?? 250
-      }
-    }),
-    signal: AbortSignal.timeout(45000)
-  });
+  let response;
 
-  const data = await response.json();
+  try {
+    console.log("Gemini: sending request...");
+
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": GEMINI_API_KEY
+      },
+      body: JSON.stringify({
+        systemInstruction: {
+          parts: [{ text: systemInstruction }]
+        },
+        contents,
+        generationConfig: {
+          temperature: options.temperature ?? 0.5,
+          maxOutputTokens: options.maxOutputTokens ?? 250
+        }
+      }),
+      signal: AbortSignal.timeout(90000)
+    });
+
+  } catch (error) {
+    if (
+      error.name === "TimeoutError" ||
+      error.name === "AbortError"
+    ) {
+      throw new Error(
+        "Gemini request timed out after 90 seconds. Check API availability and quota."
+      );
+    }
+
+    throw new Error(
+      `Gemini connection failed: ${error.message}`
+    );
+  }
+
+  const responseText = await response.text();
+
+  let data;
+
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    throw new Error(
+      `Gemini returned an invalid response. HTTP ${response.status}`
+    );
+  }
 
   if (!response.ok) {
     throw new Error(
@@ -179,11 +210,16 @@ async function geminiGenerate(
     .trim();
 
   if (!result) {
-    throw new Error("Gemini returned an empty answer.");
+    throw new Error(
+      "Gemini returned an empty answer."
+    );
   }
+
+  console.log("Gemini: response received.");
 
   return result;
 }
+
 
 // --------------------------------------------------
 // AUDIO CONVERSION
