@@ -19,6 +19,7 @@
   "dotenv": "^16.4.5",
   "google-tts-api": "*",
   "@sefinek/google-tts-api": "*",
-  "ffmpeg-static": "^5.2.0"
+  "ffmpeg-static": "^5.2.0",
+  "@andresaya/edge-tts": "^1.9.1"
 }
 }
