@@ -27,7 +27,6 @@ const {
 
 const prism = require("prism-media");
 const { Readable } = require("stream");
-const googleTTS = require("@sefinek/google-tts-api");
 
 // --------------------------------------------------
 // CONFIGURATION
