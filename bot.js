@@ -164,7 +164,7 @@ async function geminiGenerate(
           maxOutputTokens: options.maxOutputTokens ?? 250
         }
       }),
-      signal: AbortSignal.timeout(90000)
+      signal: AbortSignal.timeout(30000)
     });
 
   } catch (error) {
