@@ -131,6 +131,7 @@ const processingUsers = new Set();
 const armedUsers = new Map();
 
 
+
 // --------------------------------------------------
 // GEMINI API
 // --------------------------------------------------
@@ -143,10 +144,14 @@ async function geminiGenerate(
   const url =
     `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
 
+  const attempt = options.retryAttempt ?? 0;
+
   let response;
 
   try {
-    console.log("Gemini: sending request...");
+    console.log(
+      `Gemini: sending request (attempt ${attempt + 1}/4)...`
+    );
 
     response = await fetch(url, {
       method: "POST",
@@ -173,7 +178,7 @@ async function geminiGenerate(
       error.name === "AbortError"
     ) {
       throw new Error(
-        "Gemini request timed out after 90 seconds. Check API availability and quota."
+        "Gemini request timed out after 30 seconds. Check API availability."
       );
     }
 
@@ -183,8 +188,13 @@ async function geminiGenerate(
   }
 
   const responseText = await response.text();
-console.log("Gemini HTTP STATUS:", response.status);
-console.log("Gemini RESPONSE:", responseText.slice(0, 1500));
+
+  console.log("Gemini HTTP STATUS:", response.status);
+  console.log(
+    "Gemini RESPONSE:",
+    responseText.slice(0, 1500)
+  );
+
   let data;
 
   try {
@@ -195,27 +205,41 @@ console.log("Gemini RESPONSE:", responseText.slice(0, 1500));
     );
   }
 
-if (!response.ok) {
-  const message =
-    data.error?.message ||
-    `Gemini API error: ${response.status}`;
+  if (!response.ok) {
+    const message =
+      data.error?.message ||
+      `Gemini API error: ${response.status}`;
 
-  const temporaryError =
-    response.status === 429 ||
-    response.status === 500 ||
-    response.status === 502 ||
-    response.status === 503 ||
-    response.status === 504 ||
-    message.toLowerCase().includes("high demand");
+    const temporaryError =
+      response.status === 429 ||
+      response.status === 500 ||
+      response.status === 502 ||
+      response.status === 503 ||
+      response.status === 504;
 
-  if (temporaryError) {
-    const error = new Error(message);
-    error.retryable = true;
-    throw error;
+    if (temporaryError && attempt < 3) {
+      const delay = 2000 * (attempt + 1);
+
+      console.log(
+        `Gemini temporarily unavailable. Retry ${attempt + 1}/3 in ${delay / 1000} seconds.`
+      );
+
+      await new Promise(resolve =>
+        setTimeout(resolve, delay)
+      );
+
+      return geminiGenerate(
+        contents,
+        systemInstruction,
+        {
+          ...options,
+          retryAttempt: attempt + 1
+        }
+      );
+    }
+
+    throw new Error(message);
   }
-
-  throw new Error(message);
-}
 
   const result = (
     data.candidates?.[0]?.content?.parts || []
