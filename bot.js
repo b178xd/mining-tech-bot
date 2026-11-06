@@ -183,7 +183,8 @@ async function geminiGenerate(
   }
 
   const responseText = await response.text();
-
+console.log("Gemini HTTP STATUS:", response.status);
+console.log("Gemini RESPONSE:", responseText.slice(0, 1500));
   let data;
 
   try {
