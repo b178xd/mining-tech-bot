@@ -1026,8 +1026,8 @@ const commands = [
 
 async function registerCommands() {
   const GUILD_IDS = [
-    "FIRST_SERVER_ID",
-    "SECOND_SERVER_ID"
+    "1484736376053436426",
+    "1429096347037995061"
   ];
 
   for (const guildId of GUILD_IDS) {
