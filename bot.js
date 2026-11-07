@@ -640,7 +640,7 @@ async function handleTranscript(
   console.log("NORMALIZED SPEECH:", normalized);
 
   const wakePattern =
-    /\bhey\s+(?:mister|mr)\s+t\s*(?:9|nine)\b/;
+  /\bhey\s+mister\s+(?:tier\s+)?(?:9|nine)\b/;
 
   const wakeMatch = normalized.match(wakePattern);
 
