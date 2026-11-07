@@ -957,7 +957,7 @@ await speak(
 ).catch(error => {
   console.error("STARTUP TTS FAILED:", error.message);
 });
-
+}
 // --------------------------------------------------
 // LEAVE MISTER T9
 // --------------------------------------------------
