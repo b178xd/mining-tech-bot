@@ -169,7 +169,7 @@ async function geminiGenerate(
           maxOutputTokens: options.maxOutputTokens ?? 250
         }
       }),
-      signal: AbortSignal.timeout(30000)
+      signal: AbortSignal.timeout(90000)
     });
 
   } catch (error) {
@@ -178,7 +178,7 @@ async function geminiGenerate(
       error.name === "AbortError"
     ) {
       throw new Error(
-        "Gemini request timed out after 30 seconds. Check API availability."
+        "Gemini request timed out after 90 seconds. Check API availability."
       );
     }
 
@@ -1019,13 +1019,21 @@ const commands = [
     )
 ];
 
-// --------------------------------------------------
-// REGISTER COMMANDS
-// --------------------------------------------------
+
+ // --------------------------------------------------
+ // REGISTER COMMANDS IN BOTH SERVERS
+ // --------------------------------------------------
 
 async function registerCommands() {
-  for (const guild of client.guilds.cache.values()) {
+  const GUILD_IDS = [
+    "FIRST_SERVER_ID",
+    "SECOND_SERVER_ID"
+  ];
+
+  for (const guildId of GUILD_IDS) {
     try {
+      const guild = await client.guilds.fetch(guildId);
+
       await guild.commands.set(commands);
 
       console.log(
@@ -1034,14 +1042,15 @@ async function registerCommands() {
 
     } catch (error) {
       console.error(
-        "COMMAND REGISTRATION ERROR:",
-        error
+        `COMMAND REGISTRATION ERROR for ${guildId}:`,
+        error.message
       );
     }
   }
 
   console.log("COMMAND REGISTRATION FINISHED.");
 }
+
 
 // --------------------------------------------------
 // COMMAND HANDLER
