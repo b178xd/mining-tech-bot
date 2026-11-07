@@ -1,4 +1,3 @@
-
 require("dotenv").config();
 
 const express = require("express");
@@ -129,6 +128,9 @@ const client = new Client({
 const voiceSessions = new Map();
 const processingUsers = new Set();
 const armedUsers = new Map();
+
+// Prevent repeated outage notices from flooding the text channel.
+const geminiNoticeTimes = new Map();
 
 
 
@@ -304,6 +306,8 @@ async function transcribeAudio(wavBuffer) {
         {
           text:
             "Transcribe exactly what the speaker says. " +
+            "The wake phrase is 'Hey Mister Tier 9'. " +
+            "If those words are clearly spoken, transcribe them exactly as 'Hey Mister Tier 9'. " +
             "Return only the spoken words. " +
             "Do not answer the speaker. " +
             "If there is no understandable speech, return [inaudible]."
@@ -319,11 +323,10 @@ async function transcribeAudio(wavBuffer) {
     "You are a speech transcription system.",
     {
       temperature: 0.1,
-      maxOutputTokens: 150
+      maxOutputTokens: 300
     }
   );
 }
-
 // --------------------------------------------------
 // WIKI SEARCH
 // --------------------------------------------------
@@ -448,7 +451,6 @@ Personality:
     }
   );
 }
-
 // --------------------------------------------------
 // GOOGLE TEXT TO SPEECH
 // --------------------------------------------------
@@ -520,11 +522,15 @@ async function speak(guildId, text) {
       }
     );
 
+    // Attach the Idle listener before playback starts so a short clip
+    // cannot finish before the listener is registered.
+    const playbackFinished = waitForPlayerIdle(session.player);
+
     session.player.play(resource);
 
     console.log("TTS: playing audio in Discord.");
 
-    await waitForPlayerIdle(session.player);
+    await playbackFinished;
 
     console.log("TTS: finished speaking.");
 
@@ -696,6 +702,40 @@ async function handleTranscript(
 }
 
 // --------------------------------------------------
+// GEMINI OUTAGE NOTIFICATION
+// --------------------------------------------------
+
+async function notifyGeminiUnavailable(guildId, session, error) {
+  const message = String(error?.message || error || "");
+  const isTemporary =
+    /503|UNAVAILABLE|429|RESOURCE_EXHAUSTED|high demand|temporarily unavailable/i.test(message);
+
+  if (!isTemporary) return;
+
+  const now = Date.now();
+  const lastNotice = geminiNoticeTimes.get(guildId) || 0;
+
+  // Send at most one notice per guild every 60 seconds.
+  if (now - lastNotice < 60000) return;
+
+  geminiNoticeTimes.set(guildId, now);
+
+  if (voiceSessions.get(guildId) !== session) return;
+
+  const textChannel = await client.channels
+    .fetch(session.textChannelId)
+    .catch(() => null);
+
+  if (textChannel && textChannel.isTextBased()) {
+    await textChannel.send(
+      "⚠️ Mister T9 is temporarily unable to reach Gemini. The voice session is still active; please try again shortly."
+    ).catch(sendError => {
+      console.error("GEMINI OUTAGE NOTICE ERROR:", sendError.message);
+    });
+  }
+}
+
+// --------------------------------------------------
 // DISCORD VOICE LISTENING
 // --------------------------------------------------
 
@@ -703,6 +743,14 @@ function listenToUser(guildId, userId) {
   const session = voiceSessions.get(guildId);
 
   if (!session) return;
+
+  // Bot accounts (including music/radio bots) are never voice-query users.
+  if (userId === client.user.id) return;
+
+  if (session.ignoredBotUsers?.has(userId)) {
+    console.log("Ignoring voice activity from another bot:", userId);
+    return;
+  }
 
   if (!session.allowedUsers.has(userId)) {
     console.log("User not authorized:", userId);
@@ -712,8 +760,6 @@ function listenToUser(guildId, userId) {
   const key = `${guildId}:${userId}`;
 
   if (processingUsers.has(key)) return;
-
-  if (userId === client.user.id) return;
 
   console.log("STARTING AUDIO CAPTURE:", userId);
 
@@ -774,6 +820,11 @@ function listenToUser(guildId, userId) {
     } catch (error) {
       console.error("VOICE PROCESSING ERROR:", error);
 
+      await notifyGeminiUnavailable(guildId, session, error)
+        .catch(noticeError => {
+          console.error("GEMINI OUTAGE HANDLER ERROR:", noticeError.message);
+        });
+
     } finally {
       processingUsers.delete(key);
 
@@ -794,7 +845,7 @@ function listenToUser(guildId, userId) {
         end: {
           behavior: EndBehaviorType.AfterSilence,
           duration: 1000
-        }
+                  }
       }
     );
 
@@ -907,12 +958,20 @@ async function joinT9(interaction) {
       .map(member => member.id)
   );
 
+  // Keep bot IDs separately so radio/music bots are ignored quietly.
+  const ignoredBotUsers = new Set(
+    channel.members
+      .filter(member => member.user.bot)
+      .map(member => member.id)
+  );
+
   const session = {
     connection,
     player,
     channelId: channel.id,
     textChannelId: interaction.channelId,
-    allowedUsers
+    allowedUsers,
+    ignoredBotUsers
   };
 
   voiceSessions.set(guild.id, session);
@@ -951,13 +1010,14 @@ async function joinT9(interaction) {
     "🤖 Mister T9 is online. Voice audio is processed by Google Gemini. Everyone must agree before speaking."
   );
 
-await speak(
-  guild.id,
-  "Mister T9 online. Audio systems active. Say Hey Mister Tier 9 when you need me."
-).catch(error => {
-  console.error("STARTUP TTS FAILED:", error.message);
-});
+  await speak(
+    guild.id,
+    "Mister T9 online. Audio systems active. Say Hey Mister Tier 9 when you need me."
+  ).catch(error => {
+    console.error("STARTUP TTS FAILED:", error.message);
+  });
 }
+
 // --------------------------------------------------
 // LEAVE MISTER T9
 // --------------------------------------------------
@@ -1211,6 +1271,15 @@ client.on(
     );
 
     if (!session) return;
+
+    // Bots such as radio/music bots do not require human voice consent.
+    // Ignore their audio and do not disconnect Mister T9 when they join.
+    if (newState.member?.user.bot) {
+      if (newState.channelId === session.channelId) {
+        session.ignoredBotUsers?.add(newState.id);
+      }
+      return;
+    }
 
     const joinedT9Channel =
       newState.channelId === session.channelId &&
