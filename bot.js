@@ -951,11 +951,12 @@ async function joinT9(interaction) {
     "🤖 Mister T9 is online. Voice audio is processed by Google Gemini. Everyone must agree before speaking."
   );
 
-  await speak(
-    guild.id,
-    "Mister T9 online. Audio systems active. Say Hey Mister T9 when you need me."
-  );
-}
+await speak(
+  guild.id,
+  "Mister T9 online. Audio systems active. Say Hey Mister Tier 9 when you need me."
+).catch(error => {
+  console.error("STARTUP TTS FAILED:", error.message);
+});
 
 // --------------------------------------------------
 // LEAVE MISTER T9
