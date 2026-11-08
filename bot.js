@@ -33,7 +33,7 @@ const { Readable } = require("stream");
 
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-
+const play = require("play-dl");
 const GEMINI_MODEL =
   process.env.GEMINI_MODEL || "gemini-3.8-flash";
 const TRACKER_CHANNEL_ID =
@@ -293,7 +293,39 @@ function createWav(pcm) {
 
   return Buffer.concat([header, pcm]);
 }
+function getAudioStats(pcm) {
+  const samples = Math.floor(pcm.length / 2);
 
+  if (!samples) {
+    return {
+      rms: 0,
+      peak: 0,
+      silent: true
+    };
+  }
+
+  let sumSquares = 0;
+  let peak = 0;
+
+  for (let i = 0; i < samples; i++) {
+    const sample = pcm.readInt16LE(i * 2);
+    const value = Math.abs(sample);
+
+    sumSquares += sample * sample;
+
+    if (value > peak) {
+      peak = value;
+    }
+  }
+
+  const rms = Math.sqrt(sumSquares / samples);
+
+  return {
+    rms: Number(rms.toFixed(2)),
+    peak,
+    silent: peak < 100
+  };
+}
 // --------------------------------------------------
 // GEMINI SPEECH RECOGNITION
 // --------------------------------------------------
@@ -801,10 +833,20 @@ function listenToUser(guildId, userId) {
         return;
       }
 
-      const wav = createWav(pcm);
+      const stats = getAudioStats(pcm);
 
-      console.log("Sending audio to Gemini for transcription...");
+console.log("AUDIO STATS:", stats);
 
+if (stats.silent) {
+  console.log("Audio contains almost no audible signal.");
+  return;
+}
+
+const wav = createWav(pcm);
+
+console.log(
+  `Sending ${wav.length} bytes of WAV audio to Gemini...`
+);
       const transcript = await transcribeAudio(wav);
 
       console.log(
@@ -1056,7 +1098,16 @@ const commands = [
         .setDescription("Name of the ore")
         .setRequired(true)
     ),
-
+new SlashCommandBuilder()
+  .setName("t9say")
+  .setDescription("Make Mister T9 say something.")
+  .addStringOption(option =>
+    option
+      .setName("text")
+      .setDescription("What should Mister T9 say?")
+      .setRequired(true)
+      .setMaxLength(700)
+  ),
   new SlashCommandBuilder()
     .setName("t9")
     .setDescription("Control Mister T9.")
@@ -1163,7 +1214,63 @@ client.on(
 
         return;
       }
+            if (interaction.commandName === "t9say") {
+        const session = voiceSessions.get(interaction.guildId);
 
+        if (!session) {
+          await interaction.reply({
+            content: "Mister T9 is not connected. Use /t9 join first.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        if (interaction.member.voice.channelId !== session.channelId) {
+          await interaction.reply({
+            content: "Join Mister T9's voice channel first.",
+            ephemeral: true
+          });
+          return;
+        }
+
+        const text = interaction.options.getString("text");
+
+        await interaction.deferReply({ ephemeral: true });
+        await speak(interaction.guildId, text);
+        await interaction.editReply("Mister T9 finished speaking.");
+
+        return;
+      }
+      if (interaction.commandName === "t9say") {
+  const session = voiceSessions.get(interaction.guildId);
+
+  if (!session) {
+    await interaction.reply({
+      content: "Mister T9 is not connected. Use /t9 join first.",
+      ephemeral: true
+    });
+    return;
+  }
+
+  if (interaction.member.voice.channelId !== session.channelId) {
+    await interaction.reply({
+      content: "Join Mister T9's voice channel first.",
+      ephemeral: true
+    });
+    return;
+  }
+
+  const text = interaction.options.getString("text");
+
+  await interaction.deferReply({
+    ephemeral: true
+  });
+
+  await speak(interaction.guildId, text);
+
+  await interaction.editReply("Mister T9 finished speaking.");
+  return;
+}
       if (interaction.commandName === "t9") {
         const subcommand =
           interaction.options.getSubcommand();
